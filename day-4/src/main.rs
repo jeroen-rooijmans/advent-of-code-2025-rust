@@ -54,10 +54,10 @@ fn solve_part_two(input: &str) -> usize {
         if accessable_rolls.is_empty() {
             break;
         }
-        accessable_rolls.iter().for_each(|&coord| {
-            grid.set(coord, 'x');
+        for coord in &accessable_rolls {
+            grid.set(*coord, 'x');
             removed_rolls += 1;
-        });
+        }
     }
     removed_rolls
 }
