@@ -53,6 +53,20 @@ where
         self.map.get(coord).cloned()
     }
 
+    pub fn search(&self, item: &T) -> Vec<Coordinate<usize>>
+    where
+        T: PartialEq,
+    {
+        self.map
+            .iter()
+            .filter_map(
+                |(coord, value)| {
+                    if value == item { Some(*coord) } else { None }
+                },
+            )
+            .collect()
+    }
+
     /// # Panics
     ///
     /// Will panic if position type conversion fails.
@@ -63,60 +77,54 @@ where
         direction: Direction,
         step_size: usize,
     ) -> Option<Coordinate<usize>> {
+        let step_i32 = i32::try_from(step_size).unwrap();
+        let pos_x_i32 = i32::try_from(position.x).unwrap();
+        let pos_y_i32 = i32::try_from(position.y).unwrap();
+
         match direction {
-            Direction::North => (i32::try_from(position.x).unwrap()
-                - i32::try_from(step_size).unwrap()
-                >= 0)
-                .then(|| Coordinate {
-                    x: position.x - step_size,
-                    y: position.y,
-                }),
+            Direction::North => (pos_y_i32 - step_i32 >= 0).then(|| Coordinate {
+                x: position.x,
+                y: position.y - step_size,
+            }),
             Direction::NorthEast => {
-                let north_bound =
-                    i32::try_from(position.x).unwrap() - i32::try_from(step_size).unwrap() >= 0;
-                let east_bound = position.y + step_size <= self.num_columns;
+                let north_bound = pos_y_i32 - step_i32 >= 0;
+                let east_bound = position.x + step_size < self.num_columns;
                 (north_bound && east_bound).then(|| Coordinate {
-                    x: position.x - step_size,
-                    y: position.y + step_size,
+                    x: position.x + step_size,
+                    y: position.y - step_size,
                 })
             }
-            Direction::East => (position.y + step_size <= self.num_columns).then(|| Coordinate {
-                x: position.x,
-                y: position.y + step_size,
+            Direction::East => (position.x + step_size < self.num_columns).then(|| Coordinate {
+                x: position.x + step_size,
+                y: position.y,
             }),
             Direction::SouthEast => {
-                let south_bound = position.x + step_size <= self.num_rows;
-                let east_bound = position.y + step_size <= self.num_columns;
+                let south_bound = position.y + step_size < self.num_rows;
+                let east_bound = position.x + step_size < self.num_columns;
                 (south_bound && east_bound).then(|| Coordinate {
                     x: position.x + step_size,
                     y: position.y + step_size,
                 })
             }
-            Direction::South => (position.x + step_size <= self.num_rows).then(|| Coordinate {
-                x: position.x + step_size,
-                y: position.y,
+            Direction::South => (position.y + step_size < self.num_rows).then(|| Coordinate {
+                x: position.x,
+                y: position.y + step_size,
             }),
             Direction::SouthWest => {
-                let south_bound = position.x + step_size <= self.num_rows;
-                let west_bound =
-                    i32::try_from(position.y).unwrap() - i32::try_from(step_size).unwrap() >= 0;
+                let south_bound = position.y + step_size < self.num_rows;
+                let west_bound = pos_x_i32 - step_i32 >= 0;
                 (south_bound && west_bound).then(|| Coordinate {
-                    x: position.x + step_size,
-                    y: position.y - step_size,
+                    x: position.x - step_size,
+                    y: position.y + step_size,
                 })
             }
-            Direction::West => (i32::try_from(position.y).unwrap()
-                - i32::try_from(step_size).unwrap()
-                >= 0)
-                .then(|| Coordinate {
-                    x: position.x,
-                    y: position.y - step_size,
-                }),
+            Direction::West => (pos_x_i32 - step_i32 >= 0).then(|| Coordinate {
+                x: position.x - step_size,
+                y: position.y,
+            }),
             Direction::NorthWest => {
-                let north_bound =
-                    i32::try_from(position.x).unwrap() - i32::try_from(step_size).unwrap() >= 0;
-                let west_bound =
-                    i32::try_from(position.y).unwrap() - i32::try_from(step_size).unwrap() >= 0;
+                let north_bound = pos_y_i32 - step_i32 >= 0;
+                let west_bound = pos_x_i32 - step_i32 >= 0;
                 (north_bound && west_bound).then(|| Coordinate {
                     x: position.x - step_size,
                     y: position.y - step_size,
