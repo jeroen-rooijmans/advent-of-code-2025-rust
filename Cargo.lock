@@ -39,3 +39,7 @@ version = "0.1.0"
 dependencies = [
  "aoc",
 ]
+
+[[package]]
+name = "day-8"
+version = "0.1.0"
