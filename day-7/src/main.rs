@@ -11,8 +11,8 @@ const INPUT: &str = include_str!("./input.txt");
 /// Finds position(s) of a tachyon beam after taking a single step in time
 fn beam_step(grid: &Grid<char>, position: Coordinate<usize>) -> Vec<Coordinate<usize>> {
     let mut next_positions = Vec::new();
-    if let Some(position_south) = grid.step(position, Direction::South, 1) {
-        if let Some(next_space) = grid.get(&position_south) {
+    if let Some(position_south) = grid.step(position, Direction::South, 1)
+        && let Some(next_space) = grid.get(&position_south) {
             if next_space == '.' {
                 // Tachyon beams pass freely through empty space (.)
                 next_positions.push(position_south);
@@ -27,7 +27,6 @@ fn beam_step(grid: &Grid<char>, position: Coordinate<usize>) -> Vec<Coordinate<u
                 }
             }
         }
-    }
 
     next_positions
 }

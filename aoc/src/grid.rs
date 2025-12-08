@@ -78,16 +78,16 @@ where
         step_size: usize,
     ) -> Option<Coordinate<usize>> {
         let step_i32 = i32::try_from(step_size).unwrap();
-        let pos_x_i32 = i32::try_from(position.x).unwrap();
-        let pos_y_i32 = i32::try_from(position.y).unwrap();
+        let x_i32 = i32::try_from(position.x).unwrap();
+        let y_i32 = i32::try_from(position.y).unwrap();
 
         match direction {
-            Direction::North => (pos_y_i32 - step_i32 >= 0).then(|| Coordinate {
+            Direction::North => (y_i32 - step_i32 >= 0).then(|| Coordinate {
                 x: position.x,
                 y: position.y - step_size,
             }),
             Direction::NorthEast => {
-                let north_bound = pos_y_i32 - step_i32 >= 0;
+                let north_bound = y_i32 - step_i32 >= 0;
                 let east_bound = position.x + step_size < self.num_columns;
                 (north_bound && east_bound).then(|| Coordinate {
                     x: position.x + step_size,
@@ -112,19 +112,19 @@ where
             }),
             Direction::SouthWest => {
                 let south_bound = position.y + step_size < self.num_rows;
-                let west_bound = pos_x_i32 - step_i32 >= 0;
+                let west_bound = x_i32 - step_i32 >= 0;
                 (south_bound && west_bound).then(|| Coordinate {
                     x: position.x - step_size,
                     y: position.y + step_size,
                 })
             }
-            Direction::West => (pos_x_i32 - step_i32 >= 0).then(|| Coordinate {
+            Direction::West => (x_i32 - step_i32 >= 0).then(|| Coordinate {
                 x: position.x - step_size,
                 y: position.y,
             }),
             Direction::NorthWest => {
-                let north_bound = pos_y_i32 - step_i32 >= 0;
-                let west_bound = pos_x_i32 - step_i32 >= 0;
+                let north_bound = y_i32 - step_i32 >= 0;
+                let west_bound = x_i32 - step_i32 >= 0;
                 (north_bound && west_bound).then(|| Coordinate {
                     x: position.x - step_size,
                     y: position.y - step_size,
