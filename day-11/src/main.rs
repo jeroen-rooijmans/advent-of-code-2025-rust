@@ -15,9 +15,8 @@ fn parse_input(input: &str) -> Connections {
             let (from, to) = line.split_once(": ").unwrap();
             Some((
                 from.to_string(),
-                to.trim()
-                    .split_whitespace()
-                    .map(|s| s.to_string())
+                to.split_whitespace()
+                    .map(std::string::ToString::to_string)
                     .collect(),
             ))
         })
@@ -40,7 +39,7 @@ fn count_paths(from: &str, to: &str, connections: &Connections, cache: &mut Coun
     let mut total_paths = 0;
     if let Some(outputs) = connections.get(from) {
         for next_device in outputs {
-            total_paths += count_paths(next_device, to, connections, cache)
+            total_paths += count_paths(next_device, to, connections, cache);
         }
     }
 
