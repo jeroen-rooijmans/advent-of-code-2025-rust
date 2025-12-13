@@ -1,5 +1,7 @@
 // Advent of Code - Day 10: Factory
 
+use rayon::prelude::*;
+
 const INPUT: &str = include_str!("./input.txt");
 
 #[derive(Debug)]
@@ -7,8 +9,6 @@ struct Machine {
     // diagram of required state of machine to start, where light i corresponds the i-th bit
     // e.g. [.##.] -> 0110_2 -> 6
     diagram: usize,
-    // button[button_idx] = [light_idx or counter_idx, ...]
-    buttons: Vec<Vec<usize>>,
     // button represented by bitmask where a set bit means the button toggles that light
     // e.g. (1,3) -> 1010_2 -> 10
     button_masks: Vec<usize>,
@@ -16,9 +16,6 @@ struct Machine {
     num_lights: usize,
     // joltage target values
     joltages: Vec<usize>,
-    // captures the indices of buttons that increase a specific counter
-    // counter_dependencies[counter_idx] = [button_idx, button_idx, ...]
-    counter_dependencies: Vec<Vec<usize>>,
 }
 
 impl Machine {
@@ -28,24 +25,11 @@ impl Machine {
         num_lights: usize,
         joltages: Vec<usize>,
     ) -> Self {
-        let mut counter_dependencies = vec![Vec::new(); num_lights];
-        let mut buttons = vec![Vec::new(); button_masks.len()];
-
-        for (button_idx, &mask) in button_masks.iter().enumerate() {
-            for counter_idx in 0..num_lights {
-                if (mask & (1 << counter_idx)) != 0 {
-                    buttons[button_idx].push(counter_idx);
-                    counter_dependencies[counter_idx].push(button_idx);
-                }
-            }
-        }
         Self {
             diagram,
-            buttons,
             button_masks,
             num_lights,
             joltages,
-            counter_dependencies,
         }
     }
 
@@ -158,9 +142,142 @@ impl Machine {
         min_presses
     }
 
+    // Apply Gaussian elimination over integers.
+    // Each joltage[i] value represents the target for counter i.
     fn solve_part_two(&self) -> usize {
-        0
+        // 17820
+        // Create Augmented matrix, by augmenting A_ij with the target states
+        let num_buttons = self.button_masks.len();
+        let mut aug_matrix: Vec<Vec<isize>> = Vec::with_capacity(self.num_lights);
+        for i in 0..self.num_lights {
+            let mut row = vec![0isize; num_buttons + 1];
+            // set target
+            row[num_buttons] = self.joltages[i] as isize;
+            // set coefficients
+            for (j, &button) in self.button_masks.iter().enumerate() {
+                if (button & (1 << i)) != 0 {
+                    row[j] = 1;
+                }
+            }
+            aug_matrix.push(row);
+        }
+        // Gaussian elimination with partial pivoting over integers
+        let mut pivot_row = 0;
+        let mut pivot_cols: Vec<usize> = Vec::new();
+
+        for col in 0..num_buttons {
+            if pivot_row >= self.num_lights {
+                break;
+            }
+
+            // Find pivot
+            let mut best_pivot = pivot_row;
+            for i in pivot_row..self.num_lights {
+                if aug_matrix[i][col].abs() > aug_matrix[best_pivot][col].abs() {
+                    best_pivot = i;
+                }
+            }
+
+            if aug_matrix[best_pivot][col] == 0 {
+                continue; // No pivot found in this column
+            }
+
+            // Swap rows
+            aug_matrix.swap(pivot_row, best_pivot);
+            pivot_cols.push(col);
+
+            // Eliminate below pivot
+            for i in (pivot_row + 1)..self.num_lights {
+                if aug_matrix[i][col] != 0 {
+                    let factor = aug_matrix[i][col];
+                    let pivot_val = aug_matrix[pivot_row][col];
+                    for j in col..=num_buttons {
+                        aug_matrix[i][j] =
+                            aug_matrix[i][j] * pivot_val - aug_matrix[pivot_row][j] * factor;
+                    }
+                }
+            }
+            pivot_row += 1;
+        }
+
+        // Back substitution
+        let mut solution: Vec<isize> = vec![0; num_buttons];
+        let free_vars: Vec<usize> = (0..num_buttons)
+            .filter(|&col| !pivot_cols.contains(&col))
+            .collect();
+
+        if free_vars.is_empty() {
+            // Unique solution
+            for i in (0..pivot_cols.len()).rev() {
+                let col = pivot_cols[i];
+                let mut sum = aug_matrix[i][num_buttons];
+                for j in (col + 1)..num_buttons {
+                    sum -= aug_matrix[i][j] * solution[j];
+                }
+                if aug_matrix[i][col] != 0 {
+                    solution[col] = sum / aug_matrix[i][col];
+                }
+            }
+            return solution.iter().map(|&x| x.max(0) as usize).sum();
+        }
+        // Multiple solutions possible, we need to search for minimum
+        let max_free_val = 300; // Upper bound for button presses
+        let search_space: Vec<Vec<isize>> = (0..free_vars.len())
+            .map(|_| (0..=max_free_val).collect())
+            .collect();
+        let indices: Vec<Vec<isize>> = cartesian_product(&search_space);
+        indices
+            .par_iter()
+            .filter_map(|free_values| {
+                let mut sol = vec![0isize; num_buttons];
+                // Set free variables
+                for (i, &var_idx) in free_vars.iter().enumerate() {
+                    sol[var_idx] = free_values[i]
+                }
+                // Back substitute for pivot variables
+                for i in (0..pivot_cols.len()).rev() {
+                    let col = pivot_cols[i];
+                    let mut sum = aug_matrix[i][num_buttons];
+                    for j in (col + 1)..num_buttons {
+                        sum -= aug_matrix[i][j] * sol[j];
+                    }
+                    if aug_matrix[i][col] != 0 {
+                        // Check if division is exact
+                        if sum % aug_matrix[i][col] != 0 {
+                            return None; // Not a valid integer solution
+                        }
+                        sol[col] = sum / aug_matrix[i][col];
+                        if sol[col] < 0 {
+                            return None; // Invalid solution
+                        }
+                    }
+                }
+
+                let clicks = sol.iter().map(|&x| x.max(0) as usize).sum();
+                Some(clicks)
+            })
+            .min()
+            .unwrap_or(0)
     }
+}
+
+fn cartesian_product(vecs: &[Vec<isize>]) -> Vec<Vec<isize>> {
+    let mut result = vec![vec![]];
+    if vecs.is_empty() {
+        return result;
+    }
+    for vec in vecs {
+        let mut temp_result = vec![];
+        for existing in &result {
+            for &item in vec {
+                let mut new_vec = existing.clone();
+                new_vec.push(item);
+                temp_result.push(new_vec);
+            }
+        }
+        result = temp_result;
+    }
+    result
 }
 
 fn parse_input(input: &str) -> Vec<Machine> {
@@ -215,7 +332,7 @@ fn parse_input(input: &str) -> Vec<Machine> {
 fn solve_part_one(input: &str) -> usize {
     let machines = parse_input(input);
     machines
-        .iter()
+        .par_iter()
         .map(|machine| machine.solve_part_one())
         .sum()
 }
@@ -223,7 +340,7 @@ fn solve_part_one(input: &str) -> usize {
 fn solve_part_two(input: &str) -> usize {
     let machines = parse_input(input);
     machines
-        .iter()
+        .par_iter()
         .map(|machine| machine.solve_part_two())
         .sum()
 }
